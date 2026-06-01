@@ -27,11 +27,9 @@
             outline: none !important;
         }
 
-        /* ★変更: スマホのUIバーを考慮した高さを指定 */
         html, body {
             width: 100%;
             height: 100%;
-            height: 100dvh; 
             overflow: hidden;
             position: fixed;
             top: 0;
@@ -134,16 +132,19 @@
             transition: opacity 2s ease-in-out;
         }
         
+        /* ★変更: 写真を100%はっきりと表示させる */
         .card-slideshow-img.fade-in {
-            opacity: 0.75; 
+            opacity: 1; 
         }
 
         .month-card::after {
             content: '';
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to top, var(--bg-color) 0%, transparent 70%);
+            /* ★変更: 暗いグラデーションの範囲を40%に狭め、写真全体を明るく見せる */
+            background: linear-gradient(to top, var(--bg-color) 0%, transparent 40%);
             z-index: 2;
+            pointer-events: none;
         }
 
         /* 2. カレンダーエリア */
@@ -394,11 +395,10 @@
             display: inline-block;
         }
 
-        /* ★変更: dvhを用いて画面外へのはみ出しを完全に防止し、余裕をもたせる */
         .lightbox-img {
             max-width: calc(100vw - 20px);
             max-height: calc(100vh - 30px);
-            max-height: calc(100dvh - 30px); /* 画面の高さより30px小さく制限 */
+            max-height: calc(100dvh - 30px);
             width: auto;
             height: auto;
             display: block;
@@ -486,6 +486,7 @@
         <div class="scroll-spacer"></div>
     </div>
 
+    <!-- 左上のテーマ切り替えボタン -->
     <div class="theme-select-btn" id="theme-select-btn">THEME: <span id="current-theme-name">Main</span> ▾</div>
 
     <div class="calendar-container" id="calendar-area">
@@ -520,7 +521,7 @@
 
     <div class="modal-overlay" id="theme-overlay">
         <div class="modal-box">
-            <h3>ACCOUNTS / THEMES</h3>
+            <h3>THEMES</h3>
             <ul class="theme-list" id="theme-list"></ul>
             <button id="add-theme-btn">＋ NEW THEME</button>
             <button id="theme-close-btn">CLOSE</button>
@@ -675,7 +676,7 @@
         };
 
         document.getElementById('add-theme-btn').onclick = () => {
-            const name = prompt('テーマ名を入力してください (例: 鉄塔, 廃墟, 日常 など)');
+            const name = prompt('テーマ名を入力してください');
             if (name) {
                 const id = 'theme_' + Date.now();
                 themes.push({id, name});
@@ -937,7 +938,6 @@
                         
                         lightbox.style.display = 'flex';
                         
-                        // 画像ロード完了時に日付の位置を合わせる
                         if (lightboxImage.complete) {
                             adjustLightboxDatePosition();
                         }
@@ -1035,30 +1035,24 @@
             fileInput.click();
         });
 
-        // ★変更: 確実な余白計算と配置ロジック
         function adjustLightboxDatePosition() {
             if (!lightbox.classList.contains('open') && lightbox.style.display !== 'flex') return;
             if (!lightboxImage.clientHeight) return; 
 
-            // 画像の「実際の表示高さ」を取得
             const imgHeight = lightboxImage.clientHeight;
             const viewportHeight = window.innerHeight;
             
-            // 画面の高さと写真の高さの差分（＝上下の余白の合計）
             const remainingSpace = viewportHeight - imgHeight;
 
-            // 余白が約75px（片側で約37px）未満の場合は、はみ出さないように内側に配置
             if (remainingSpace < 75) {
                 lightboxDate.style.bottom = '3px';
-                lightboxDate.style.right = '3px';
+                lightboxDate.style.right = '5px';
             } else {
-                // 十分な余白がある場合は写真のすぐ外側に配置
                 lightboxDate.style.bottom = '-20px';
                 lightboxDate.style.right = '0px';
             }
         }
 
-        // 写真が読み込まれたタイミングで確実に位置を再計算
         lightboxImage.addEventListener('load', adjustLightboxDatePosition);
 
         lightboxCloseBtn.addEventListener('click', (e) => {
