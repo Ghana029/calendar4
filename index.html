@@ -132,7 +132,6 @@
             transition: opacity 2s ease-in-out;
         }
         
-        /* ★変更: 写真を100%はっきりと表示させる */
         .card-slideshow-img.fade-in {
             opacity: 1; 
         }
@@ -141,7 +140,6 @@
             content: '';
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            /* ★変更: 暗いグラデーションの範囲を40%に狭め、写真全体を明るく見せる */
             background: linear-gradient(to top, var(--bg-color) 0%, transparent 40%);
             z-index: 2;
             pointer-events: none;
@@ -171,7 +169,7 @@
 
         .calendar-header {
             position: absolute;
-            top: 40px;
+            top: 20px;
             left: 20px;
             z-index: 10;
             display: flex;
@@ -206,7 +204,7 @@
 
         .theme-select-btn {
             position: absolute;
-            top: 40px;
+            top: 20px;
             left: 20px;
             z-index: 20;
             border-radius: 6px;
@@ -218,11 +216,11 @@
 
         .toggle-view-btn { position: absolute; bottom: 40px; right: 20px; z-index: 10; }
         .settings-btn { position: absolute; bottom: 40px; left: 20px; z-index: 10; }
-        .gallery-close-btn { position: absolute; top: 40px; left: 20px; z-index: 25; }
+        .gallery-close-btn { position: absolute; top: 20px; left: 20px; z-index: 25; }
 
         .lightbox-close-btn { 
             position: absolute; 
-            top: 40px; 
+            top: 20px; 
             left: 20px; 
             z-index: 105; 
             opacity: 0.3; 
@@ -328,7 +326,7 @@
             background-color: var(--bg-color);
             z-index: 20;
             display: none;
-            padding-top: 90px; 
+            padding-top: 70px; 
             box-sizing: border-box;
             overflow-y: auto;
         }
@@ -476,6 +474,41 @@
         .theme-item.active { background-color: var(--text-color); color: var(--bg-color); font-weight: bold; }
         .theme-item:hover:not(.active) { background-color: var(--border-active); }
 
+        /* 6. カスタムアクションシート（変更・削除用メニュー） */
+        .action-sheet-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.6); z-index: 300; display: none;
+            justify-content: center; align-items: flex-end; opacity: 0; transition: opacity 0.3s;
+            padding-bottom: 30px; box-sizing: border-box;
+        }
+        .action-sheet-overlay.open { display: flex; opacity: 1; }
+        .action-sheet-box {
+            width: 90%; max-width: 400px;
+            display: flex; flex-direction: column; gap: 8px;
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .action-sheet-overlay.open .action-sheet-box { transform: translateY(0); }
+        .action-sheet-group {
+            display: flex; flex-direction: column;
+            background-color: var(--card-bg); border-radius: 12px; overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        .action-sheet-btn {
+            background-color: transparent; color: var(--text-color); border: none;
+            padding: 18px; cursor: pointer; font-family: inherit; font-size: 1rem; letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+        }
+        .action-sheet-btn:last-child { border-bottom: none; }
+        .action-sheet-btn:active { background-color: var(--border-active); }
+        .action-sheet-btn.danger { color: #ff6b6b; font-weight: bold; }
+        .action-sheet-cancel {
+            background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);
+            padding: 18px; border-radius: 12px; cursor: pointer; font-family: inherit; font-size: 1rem; letter-spacing: 0.1em; font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .action-sheet-cancel:active { background-color: var(--border-active); }
+
         #file-input { display: none; }
     </style>
 </head>
@@ -486,7 +519,6 @@
         <div class="scroll-spacer"></div>
     </div>
 
-    <!-- 左上のテーマ切り替えボタン -->
     <div class="theme-select-btn" id="theme-select-btn">THEME: <span id="current-theme-name">Main</span> ▾</div>
 
     <div class="calendar-container" id="calendar-area">
@@ -521,7 +553,7 @@
 
     <div class="modal-overlay" id="theme-overlay">
         <div class="modal-box">
-            <h3>THEMES</h3>
+            <h3>ACCOUNTS / THEMES</h3>
             <ul class="theme-list" id="theme-list"></ul>
             <button id="add-theme-btn">＋ NEW THEME</button>
             <button id="theme-close-btn">CLOSE</button>
@@ -546,6 +578,16 @@
                 </select>
             </label>
             <button id="settings-close-btn">OK</button>
+        </div>
+    </div>
+
+    <div class="action-sheet-overlay" id="action-sheet">
+        <div class="action-sheet-box">
+            <div class="action-sheet-group">
+                <button class="action-sheet-btn" id="action-change-btn">写真を変更する</button>
+                <button class="action-sheet-btn danger" id="action-delete-btn">写真を削除する</button>
+            </div>
+            <button class="action-sheet-cancel" id="action-cancel-btn">キャンセル</button>
         </div>
     </div>
 
@@ -676,7 +718,7 @@
         };
 
         document.getElementById('add-theme-btn').onclick = () => {
-            const name = prompt('テーマ名を入力してください');
+            const name = prompt('テーマ名を入力してください (例: 鉄塔, 廃墟, 日常 など)');
             if (name) {
                 const id = 'theme_' + Date.now();
                 themes.push({id, name});
@@ -726,6 +768,12 @@
         const lightboxContainerDOM = document.getElementById('lightbox-container');
         const lightboxCloseBtn = document.getElementById('lightbox-close-btn');
         
+        // ★追加: アクションシート用要素
+        const actionSheet = document.getElementById('action-sheet');
+        const actionChangeBtn = document.getElementById('action-change-btn');
+        const actionDeleteBtn = document.getElementById('action-delete-btn');
+        const actionCancelBtn = document.getElementById('action-cancel-btn');
+
         let currentYear = 2026;
         let currentMonth = 5;
         let currentSelectedTile = null;
@@ -1027,14 +1075,6 @@
             }
         }
 
-        lightboxImage.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (galleryContainer.style.display === 'block') {
-                return;
-            }
-            fileInput.click();
-        });
-
         function adjustLightboxDatePosition() {
             if (!lightbox.classList.contains('open') && lightbox.style.display !== 'flex') return;
             if (!lightboxImage.clientHeight) return; 
@@ -1045,15 +1085,71 @@
             const remainingSpace = viewportHeight - imgHeight;
 
             if (remainingSpace < 75) {
-                lightboxDate.style.bottom = '3px';
-                lightboxDate.style.right = '5px';
+                lightboxDate.style.bottom = '8px';
+                lightboxDate.style.right = '8px';
             } else {
-                lightboxDate.style.bottom = '-20px';
+                lightboxDate.style.bottom = '-25px';
                 lightboxDate.style.right = '0px';
             }
         }
 
         lightboxImage.addEventListener('load', adjustLightboxDatePosition);
+
+        // ★追加: ライトボックスの写真をタップした時に、ネイティブファイルダイアログではなくアクションシートを開く
+        lightboxImage.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (galleryContainer.style.display === 'block') {
+                return;
+            }
+            actionSheet.style.display = 'flex';
+            setTimeout(() => actionSheet.classList.add('open'), 10);
+        });
+
+        // アクションシートの「キャンセル」または背景タップ
+        function closeActionSheet() {
+            actionSheet.classList.remove('open');
+            setTimeout(() => actionSheet.style.display = 'none', 300);
+        }
+        actionCancelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeActionSheet();
+        });
+        actionSheet.addEventListener('click', (e) => {
+            if (e.target === actionSheet) closeActionSheet();
+        });
+
+        // アクションシートの「写真を変更する」
+        actionChangeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeActionSheet();
+            fileInput.click();
+        });
+
+        // アクションシートの「写真を削除する」
+        actionDeleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm("この写真をカレンダーから削除しますか？")) {
+                const day = currentSelectedTile.dataset.day;
+                const storageKey = getStorageKey(currentYear, currentMonth);
+                let savedPhotos = JSON.parse(localStorage.getItem(storageKey)) || {};
+                
+                delete savedPhotos[day];
+                localStorage.setItem(storageKey, JSON.stringify(savedPhotos));
+
+                currentSelectedTile.classList.remove('has-image');
+                const img = currentSelectedTile.querySelector('img');
+                if(img) img.remove();
+
+                const currentCardObj = cardObjects.find(c => c.month === currentMonth);
+                startCardSlideshow(currentCardObj);
+
+                closeActionSheet();
+                lightbox.classList.remove('open');
+                setTimeout(() => lightbox.style.display = 'none', 400);
+            } else {
+                closeActionSheet();
+            }
+        });
 
         lightboxCloseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1063,7 +1159,9 @@
             }, 400);
         });
 
-        lightbox.addEventListener('click', () => {
+        lightbox.addEventListener('click', (e) => {
+            // アクションシートが開いている場合はライトボックスを閉じない
+            if (actionSheet.classList.contains('open')) return;
             lightbox.classList.remove('open');
             setTimeout(() => {
                 lightbox.style.display = 'none';
