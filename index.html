@@ -267,6 +267,7 @@
             }
         }
 
+        /* 書き出し時に前後の月を非表示にする専用のCSS */
         body.export-active #calendar-prev,
         body.export-active #calendar-next {
             display: none !important;
@@ -547,7 +548,6 @@
         }
         #export-result-close-btn:active { background-color: var(--border-active); }
         
-        /* ★追加: 書き出した画像を長押し保存できるように制限を解除 */
         .export-result-img {
             max-width: 90%; max-height: 80%; object-fit: contain;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
@@ -967,6 +967,7 @@
             galleryContainer.style.display = 'none';
         });
 
+        // ★変更: バグを回避するための「ダミー撮影」を挟んだ2段構えの書き出し処理
         exportBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             
@@ -981,13 +982,16 @@
             ];
             uiElements.forEach(el => el.style.opacity = '0');
             
-            // ★変更: cacheBustオプションを削除し、データURIが破壊されるのを防ぐ
             document.body.classList.add('export-active');
             calendarWrapper.scrollLeft = 0;
 
             await new Promise(resolve => setTimeout(resolve, 300));
 
             try {
+                // 1. Safari等での画像抜けバグを防ぐため、一度「ダミー」で空の撮影を行う
+                await htmlToImage.toPng(calendarArea);
+
+                // 2. 直後に「本番」の高画質撮影を行う
                 const dataUrl = await htmlToImage.toPng(calendarArea, {
                     backgroundColor: getComputedStyle(document.body).backgroundColor || '#000000',
                     pixelRatio: 2
