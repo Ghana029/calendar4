@@ -500,7 +500,7 @@
 
     <div class="modal-overlay" id="theme-overlay">
         <div class="modal-box">
-            <h3>ACCOUNTS / THEMES</h3>
+            <h3>THEMES</h3>
             <ul class="theme-list" id="theme-list"></ul>
             <button id="add-theme-btn">＋ NEW THEME</button>
             <button id="theme-close-btn">CLOSE</button>
@@ -659,7 +659,7 @@
         };
 
         document.getElementById('add-theme-btn').onclick = () => {
-            const name = prompt('テーマ名を入力してください (例: 鉄塔, 廃墟, 日常 など)');
+            const name = prompt('テーマ名を入力してください');
             if (name) {
                 const id = 'theme_' + Date.now();
                 themes.push({id, name});
