@@ -68,7 +68,6 @@
             display: none;
         }
 
-        /* カレンダー展開時に背景の月カードコンテナ全体を完全に消す */
         body.calendar-open .month-scroll-container {
             transform: scale(0.95);
             opacity: 0;
@@ -84,25 +83,24 @@
         .month-card {
             width: calc(100vw - 20px);
             max-width: 362px;
-            aspect-ratio: 16 / 9; /* 横幅に合わせて高さを自動設定 */
+            aspect-ratio: 16 / 9; 
             background-color: var(--card-bg);
             border-radius: 12px;
             position: relative;
             overflow: hidden;
             flex-shrink: 0;
-            scroll-snap-align: center;
             box-shadow: 0 10px 40px rgba(0,0,0,0.5);
             
-            opacity: 0; /* 初期状態は非表示（JSで制御） */
+            opacity: 0; 
             transform: scale(0.85);
             z-index: 1;
             
-            /* アニメーションを滑らかに調整 */
             transition: transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.4s ease, border 0.3s;
             cursor: pointer;
             box-sizing: border-box;
             border: 1px solid var(--border-color);
             margin: 10px 0;
+            will-change: transform, opacity;
         }
 
         .month-card.active {
@@ -110,7 +108,7 @@
             transform: scale(1) translateY(0) !important;
             z-index: 10 !important;
             border: 1px solid var(--border-active);
-            box-shadow: 0 15px 50px rgba(0,0,0,0.8); /* アクティブ時は影を強めて浮かせる */
+            box-shadow: 0 15px 50px rgba(0,0,0,0.8);
         }
         
         .month-card .card-title {
@@ -169,7 +167,6 @@
             pointer-events: auto;
         }
 
-        /* 左上のカレンダーヘッダー（月表示と戻るボタン） */
         .calendar-header {
             position: absolute;
             top: 40px;
@@ -190,7 +187,7 @@
             opacity: 0.9;
         }
 
-        /* ボタン類の共通スタイル（囲み枠ありのデザインに統一） */
+        /* ボタン類の共通スタイル */
         .theme-select-btn, .toggle-view-btn, .settings-btn, 
         .back-to-months-btn, .gallery-close-btn, .lightbox-close-btn {
             color: var(--text-color);
@@ -203,7 +200,7 @@
             cursor: pointer;
             background-color: var(--bg-color);
             text-shadow: none;
-            transition: opacity 0.3s, background-color 0.2s;
+            transition: opacity 0.3s, background-color 0.2s, border-color 0.2s;
         }
 
         .theme-select-btn {
@@ -221,7 +218,23 @@
         .toggle-view-btn { position: absolute; bottom: 40px; right: 20px; z-index: 10; }
         .settings-btn { position: absolute; bottom: 40px; left: 20px; z-index: 10; }
         .gallery-close-btn { position: absolute; top: 40px; left: 20px; z-index: 25; }
-        .lightbox-close-btn { position: absolute; top: 40px; left: 20px; z-index: 105; }
+
+        /* ★変更: ライトボックス（拡大表示）用の戻るボタン。写真の邪魔にならないよう調整 */
+        .lightbox-close-btn { 
+            position: absolute; 
+            top: 40px; 
+            left: 20px; 
+            z-index: 105; 
+            opacity: 0.3; /* 薄くして主張を弱める */
+            background-color: color-mix(in srgb, var(--bg-color) 40%, transparent); /* 背景を半透明に */
+            border-color: color-mix(in srgb, var(--border-color) 40%, transparent); /* 枠線も半透明に */
+            backdrop-filter: blur(4px); /* 写真と文字が同化するのを防ぐすりガラス効果 */
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .lightbox-close-btn:hover, .lightbox-close-btn:active {
+            opacity: 1; /* タップ時やホバー時はしっかり表示 */
+            background-color: color-mix(in srgb, var(--bg-color) 80%, transparent);
+        }
 
         .calendar-scroll-wrapper {
             width: 100%;
@@ -406,7 +419,7 @@
             text-shadow: 0 1px 3px var(--bg-color);
         }
 
-        /* 5. モーダル共通デザイン（設定＆テーマ切り替え） */
+        /* 5. モーダル共通デザイン */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.6); z-index: 200; display: none;
@@ -500,7 +513,7 @@
 
     <div class="modal-overlay" id="theme-overlay">
         <div class="modal-box">
-            <h3>THEMES</h3>
+            <h3>ACCOUNTS / THEMES</h3>
             <ul class="theme-list" id="theme-list"></ul>
             <button id="add-theme-btn">＋ NEW THEME</button>
             <button id="theme-close-btn">CLOSE</button>
@@ -571,7 +584,6 @@
             }));
         }
 
-        // 背景色の明るさを判定する関数
         function getBrightness(hex) {
             let h = hex.replace('#', '');
             if (h.length === 3) h = h.split('').map(c => c + c).join('');
@@ -581,7 +593,6 @@
             return (r * 299 + g * 587 + b * 114) / 1000;
         }
 
-        // 背景色が変更されたときの処理（自動コントラスト調整）
         bgPicker.addEventListener('input', (e) => { 
             const newBg = e.target.value;
             const currentText = textPicker.value;
@@ -590,7 +601,6 @@
             
             const bgBrightness = getBrightness(newBg);
             const textBrightness = getBrightness(currentText);
-
             const brightnessDiff = Math.abs(bgBrightness - textBrightness);
 
             if (brightnessDiff < 125) {
@@ -600,7 +610,6 @@
             } else {
                 rootVars.setProperty('--text-color', currentText);
             }
-
             saveThemeDesign(); 
         });
 
@@ -659,7 +668,7 @@
         };
 
         document.getElementById('add-theme-btn').onclick = () => {
-            const name = prompt('テーマ名を入力してください');
+            const name = prompt('テーマ名を入力してください (例: 鉄塔, 廃墟, 日常 など)');
             if (name) {
                 const id = 'theme_' + Date.now();
                 themes.push({id, name});
@@ -720,7 +729,7 @@
         let currentPhotoIndex = -1;
         let touchStartX = 0;
         let touchEndX = 0;
-        let snapVelocityTimeoutId = null;
+        let scrollTimeoutId = null;
 
         // --- UI制御（画面の開閉など） ---
         
@@ -1038,7 +1047,6 @@
             calendarWrapper.scrollLeft = targetLeft;
         }
 
-        // ★追加: 月カードにも重なりのスタック効果を付与
         function applyLayerEffects() {
             if(document.body.classList.contains('calendar-open')) {
                 calendarMonthText.textContent = `${currentYear} . ${String(currentMonth).padStart(2, '0')}`;
@@ -1048,7 +1056,7 @@
                 const card = cardObj.element;
                 const diff = cardObj.month - currentMonth;
                 
-                card.style.pointerEvents = "auto"; // デフォルトでクリック可能に
+                card.style.pointerEvents = "auto"; 
 
                 if (diff === 0) {
                     card.classList.add('active');
@@ -1058,27 +1066,27 @@
                 } else {
                     card.classList.remove('active');
                     
-                    if (diff === 1) { // 次の月 (下)
+                    if (diff === 1) { 
                         card.style.transform = "scale(0.85) translateY(-30%)";
                         card.style.opacity = "0.5";
                         card.style.zIndex = "5";
                     } 
-                    else if (diff === -1) { // 前の月 (上)
+                    else if (diff === -1) { 
                         card.style.transform = "scale(0.85) translateY(30%)";
                         card.style.opacity = "0.5";
                         card.style.zIndex = "5";
                     } 
-                    else if (diff === 2) { // さらに次の月
+                    else if (diff === 2) { 
                         card.style.transform = "scale(0.7) translateY(-65%)";
                         card.style.opacity = "0.15";
                         card.style.zIndex = "4";
                     }
-                    else if (diff === -2) { // さらに前の月
+                    else if (diff === -2) { 
                         card.style.transform = "scale(0.7) translateY(65%)";
                         card.style.opacity = "0.15";
                         card.style.zIndex = "4";
                     }
-                    else { // それ以外は隠す
+                    else { 
                         const sign = Math.sign(diff);
                         card.style.transform = `scale(0.5) translateY(${sign * -100}%)`;
                         card.style.opacity = "0";
@@ -1091,60 +1099,41 @@
 
         scrollContainer.addEventListener('scroll', () => {
             if (isSyncingScroll) return;
-            
-            if (snapVelocityTimeoutId) clearTimeout(snapVelocityTimeoutId);
 
             const containerCenter = scrollContainer.scrollTop + scrollContainer.clientHeight / 2;
-            let targetCardObj = null;
+            let closestCard = null;
+            let minDiff = Infinity;
 
             cardObjects.forEach((cardObj) => {
-                const card = cardObj.element;
-                const cardCenter = card.offsetTop + card.clientHeight / 2;
-                
-                if (Math.abs(containerCenter - cardCenter) < 40) {
-                    targetCardObj = cardObj;
+                const cardCenter = cardObj.element.offsetTop + cardObj.element.clientHeight / 2;
+                const diff = Math.abs(containerCenter - cardCenter);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestCard = cardObj;
                 }
             });
 
-            if (targetCardObj && currentMonth !== targetCardObj.month) {
-                currentMonth = targetCardObj.month;
+            if (closestCard && currentMonth !== closestCard.month) {
+                currentMonth = closestCard.month;
                 applyLayerEffects();
-                updateAllCalendarGrids();
-                
-                isSyncingScroll = true;
-                syncCalendarPosition();
-                setTimeout(() => isSyncingScroll = false, 50);
             }
 
-            snapVelocityTimeoutId = setTimeout(() => {
-                if (isSyncingScroll) return;
+            if(scrollTimeoutId) clearTimeout(scrollTimeoutId);
+            
+            scrollTimeoutId = setTimeout(() => {
+                isSyncingScroll = true;
                 
+                updateAllCalendarGrids();
+                syncCalendarPosition();
+
                 const activeCardObj = cardObjects.find(c => c.month === currentMonth);
                 if (activeCardObj) {
-                    isSyncingScroll = true;
                     activeCardObj.element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-                    
-                    setTimeout(() => {
-                        isSyncingScroll = false;
-                        syncCalendarPosition();
-                    }, 200);
                 }
-            }, 40);
+                
+                setTimeout(() => { isSyncingScroll = false; }, 300);
+            }, 200); 
         });
-
-        function updateActiveCardAndScroll() {
-            isSyncingScroll = true;
-            
-            applyLayerEffects();
-            
-            const activeCardObj = cardObjects.find(c => c.month === currentMonth);
-            activeCardObj.element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-            
-            updateAllCalendarGrids();
-            syncCalendarPosition();
-            
-            setTimeout(() => isSyncingScroll = false, 300);
-        }
 
         // --- 画像アップロード ---
         fileInput.addEventListener('change', (event) => {
