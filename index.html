@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Photo Calendar</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
         /* --- 動的テーマ用の変数定義 --- */
         :root {
@@ -30,6 +31,7 @@
         html, body {
             width: 100%;
             height: 100%;
+            height: 100dvh; 
             overflow: hidden;
             position: fixed;
             top: 0;
@@ -140,7 +142,7 @@
             content: '';
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to top, var(--bg-color) 0%, transparent 40%);
+            background: linear-gradient(to top, var(--bg-color) 0%, transparent 30%);
             z-index: 2;
             pointer-events: none;
         }
@@ -187,8 +189,9 @@
             opacity: 0.9;
         }
 
+        /* ボタン類の共通スタイル */
         .theme-select-btn, .toggle-view-btn, .settings-btn, 
-        .back-to-months-btn, .gallery-close-btn, .lightbox-close-btn {
+        .back-to-months-btn, .gallery-close-btn, .lightbox-close-btn, .export-btn {
             color: var(--text-color);
             opacity: 0.7;
             font-size: 0.8rem;
@@ -214,6 +217,7 @@
             pointer-events: none;
         }
 
+        .export-btn { position: absolute; top: 20px; right: 20px; z-index: 10; }
         .toggle-view-btn { position: absolute; bottom: 40px; right: 20px; z-index: 10; }
         .settings-btn { position: absolute; bottom: 40px; left: 20px; z-index: 10; }
         .gallery-close-btn { position: absolute; top: 20px; left: 20px; z-index: 25; }
@@ -254,12 +258,18 @@
             margin: 0 10px !important; 
             scroll-snap-align: center;
             flex-shrink: 0;
+            transition: opacity 0.3s ease; 
         }
 
         @media (min-width: 382px) {
             .calendar-grid {
                 margin: 0 calc((100vw - 362px) / 2) !important;
             }
+        }
+
+        body.export-active #calendar-prev,
+        body.export-active #calendar-next {
+            display: none !important;
         }
 
         .day-tile {
@@ -469,12 +479,19 @@
             padding: 12px 15px; cursor: pointer; transition: background 0.2s;
             font-size: 0.9rem; letter-spacing: 0.1em;
             border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
         }
         .theme-item:last-child { border-bottom: none; }
         .theme-item.active { background-color: var(--text-color); color: var(--bg-color); font-weight: bold; }
         .theme-item:hover:not(.active) { background-color: var(--border-active); }
 
-        /* 6. カスタムアクションシート（変更・削除用メニュー） */
+        .theme-delete-btn {
+            color: #ff6b6b; font-size: 1.2rem; line-height: 1; padding: 0 5px; 
+            cursor: pointer; opacity: 0.7; transition: opacity 0.2s;
+        }
+        .theme-delete-btn:hover { opacity: 1; }
+
+        /* 6. カスタムアクションシート */
         .action-sheet-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.6); z-index: 300; display: none;
@@ -509,6 +526,37 @@
         }
         .action-sheet-cancel:active { background-color: var(--border-active); }
 
+        /* 書き出し結果表示用オーバーレイ */
+        .export-result-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color); z-index: 400; display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .export-result-overlay.open { display: flex; opacity: 1; }
+        .export-result-header {
+            position: absolute; top: 20px; width: calc(100% - 40px);
+            display: flex; justify-content: space-between; align-items: center;
+            color: var(--text-color); font-size: 0.9rem; letter-spacing: 0.1em;
+            z-index: 410;
+        }
+        #export-result-close-btn {
+            background: transparent; border: 1px solid var(--border-color); color: var(--text-color);
+            padding: 6px 12px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.8rem;
+            letter-spacing: 0.1em; transition: background-color 0.2s;
+        }
+        #export-result-close-btn:active { background-color: var(--border-active); }
+        
+        /* ★追加: 書き出した画像を長押し保存できるように制限を解除 */
+        .export-result-img {
+            max-width: 90%; max-height: 80%; object-fit: contain;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            -webkit-touch-callout: default !important;
+            -webkit-user-select: auto !important;
+            user-select: auto !important;
+            pointer-events: auto !important;
+        }
+
         #file-input { display: none; }
     </style>
 </head>
@@ -529,6 +577,8 @@
 
         <div class="settings-btn" id="settings-btn">SETTINGS</div>
         <div class="toggle-view-btn" id="toggle-view-btn">GALLERY</div>
+        <div class="export-btn" id="export-btn">EXPORT</div>
+
         <div class="calendar-scroll-wrapper" id="calendar-wrapper">
             <main class="calendar-grid" id="calendar-prev"></main>
             <main class="calendar-grid" id="calendar-current"></main>
@@ -591,9 +641,68 @@
         </div>
     </div>
 
+    <div class="export-result-overlay" id="export-result-overlay">
+        <div class="export-result-header">
+            <span>長押しして「写真を保存」</span>
+            <button id="export-result-close-btn">CLOSE</button>
+        </div>
+        <img class="export-result-img" id="export-result-img" src="" alt="書き出し画像">
+    </div>
+
     <input type="file" id="file-input" accept="image/*">
 
     <script>
+        // ★★★ IndexedDB (大容量保存) のセットアップ ★★★
+        const DB_NAME = 'PhotoCalendarDB';
+        const STORE_NAME = 'photos';
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getPhotoData(key) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(key);
+                request.onsuccess = () => resolve(request.result || {});
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function savePhotoData(key, data) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(data, key);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function deletePhotoData(key) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.delete(key);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
         // --- データ管理（テーマ・アカウント） ---
         let currentThemeId = localStorage.getItem('photo_calendar_current_theme') || 'default';
         let themes = JSON.parse(localStorage.getItem('photo_calendar_themes')) || [{id: 'default', name: 'Main'}];
@@ -694,8 +803,41 @@
             themes.forEach(t => {
                 const li = document.createElement('li');
                 li.className = 'theme-item' + (t.id === currentThemeId ? ' active' : '');
-                li.textContent = t.name;
-                li.onclick = () => {
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = t.name;
+                li.appendChild(nameSpan);
+
+                if (themes.length > 1) {
+                    const delBtn = document.createElement('span');
+                    delBtn.className = 'theme-delete-btn';
+                    delBtn.innerHTML = '×';
+                    delBtn.onclick = async (e) => {
+                        e.stopPropagation(); 
+                        if (confirm(`テーマ「${t.name}」を削除しますか？\n※保存された写真データもすべて消去されます。`)) {
+                            
+                            for (let m = 1; m <= 12; m++) {
+                                const mStr = String(m).padStart(2, '0');
+                                const key = t.id === 'default' ? `photo_calendar_${currentYear}_${mStr}` : `photo_calendar_${t.id}_${currentYear}_${mStr}`;
+                                await deletePhotoData(key);
+                            }
+                            
+                            themes = themes.filter(theme => theme.id !== t.id);
+                            localStorage.setItem('photo_calendar_themes', JSON.stringify(themes));
+                            
+                            if (currentThemeId === t.id) {
+                                switchTheme(themes[0].id);
+                            } else {
+                                renderThemeList();
+                            }
+                        }
+                    };
+                    li.appendChild(delBtn);
+                }
+
+                li.onclick = (e) => {
+                    if(e.target.classList.contains('theme-delete-btn')) return;
+                    
                     switchTheme(t.id);
                     themeOverlay.classList.remove('open');
                     setTimeout(() => themeOverlay.style.display = 'none', 300);
@@ -727,7 +869,7 @@
             }
         };
 
-        function switchTheme(id) {
+        async function switchTheme(id) { 
             currentThemeId = id;
             localStorage.setItem('photo_calendar_current_theme', currentThemeId);
             renderThemeList();
@@ -740,10 +882,22 @@
             createMonthCards();
             updateAllSlideshows();
             
+            await updateAllCalendarGrids(); 
+
             if (document.body.classList.contains('calendar-open')) {
-                updateAllCalendarGrids();
                 calendarMonthText.textContent = `${currentYear} . ${String(currentMonth).padStart(2, '0')}`;
             }
+
+            if (galleryContainer.style.display === 'block') {
+                renderGallery();
+            }
+
+            setTimeout(() => {
+                const targetCard = cardObjects.find(c => c.month === currentMonth);
+                if (targetCard) {
+                    targetCard.element.scrollIntoView({ block: 'center', inline: 'nearest' });
+                }
+            }, 50);
         }
 
         // --- コア要素の取得と変数 ---
@@ -756,6 +910,7 @@
         const toggleViewBtn = document.getElementById('toggle-view-btn');
         const backToMonthsBtn = document.getElementById('back-to-months-btn'); 
         const calendarMonthText = document.getElementById('calendar-month-text');
+        const exportBtn = document.getElementById('export-btn');
         const fileInput = document.getElementById('file-input');
         
         const calPrev = document.getElementById('calendar-prev');
@@ -768,11 +923,14 @@
         const lightboxContainerDOM = document.getElementById('lightbox-container');
         const lightboxCloseBtn = document.getElementById('lightbox-close-btn');
         
-        // ★追加: アクションシート用要素
         const actionSheet = document.getElementById('action-sheet');
         const actionChangeBtn = document.getElementById('action-change-btn');
         const actionDeleteBtn = document.getElementById('action-delete-btn');
         const actionCancelBtn = document.getElementById('action-cancel-btn');
+
+        const exportResultOverlay = document.getElementById('export-result-overlay');
+        const exportResultImg = document.getElementById('export-result-img');
+        const exportResultCloseBtn = document.getElementById('export-result-close-btn');
 
         let currentYear = 2026;
         let currentMonth = 5;
@@ -809,42 +967,93 @@
             galleryContainer.style.display = 'none';
         });
 
+        exportBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            exportBtn.textContent = "WAIT...";
+            exportBtn.style.pointerEvents = "none";
+            
+            const uiElements = [
+                backToMonthsBtn,
+                document.getElementById('settings-btn'),
+                toggleViewBtn,
+                exportBtn
+            ];
+            uiElements.forEach(el => el.style.opacity = '0');
+            
+            // ★変更: cacheBustオプションを削除し、データURIが破壊されるのを防ぐ
+            document.body.classList.add('export-active');
+            calendarWrapper.scrollLeft = 0;
+
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            try {
+                const dataUrl = await htmlToImage.toPng(calendarArea, {
+                    backgroundColor: getComputedStyle(document.body).backgroundColor || '#000000',
+                    pixelRatio: 2
+                });
+
+                exportResultImg.src = dataUrl;
+                exportResultOverlay.style.display = 'flex';
+                setTimeout(() => exportResultOverlay.classList.add('open'), 10);
+
+            } catch (error) {
+                console.error(error);
+                alert('画像の書き出しに失敗しました。詳細: ' + (error.message || error));
+            } finally {
+                document.body.classList.remove('export-active');
+                uiElements.forEach(el => el.style.opacity = '0.7');
+                syncCalendarPosition();
+                
+                exportBtn.textContent = "EXPORT";
+                exportBtn.style.pointerEvents = "auto";
+            }
+        });
+
+        exportResultCloseBtn.addEventListener('click', () => {
+            exportResultOverlay.classList.remove('open');
+            setTimeout(() => {
+                exportResultOverlay.style.display = 'none';
+                exportResultImg.src = ""; 
+            }, 300);
+        });
+
         function renderGallery() {
             galleryGrid.innerHTML = '';
             const storageKey = getStorageKey(currentYear, currentMonth);
-            const savedPhotos = JSON.parse(localStorage.getItem(storageKey)) || {};
-            
-            const photoDays = Object.keys(savedPhotos).sort((a,b) => a - b);
-            const photoCount = photoDays.length;
-            
-            let cols = 3; 
-            if (photoCount === 0) cols = 1;
-            else if (photoCount === 1) cols = 1;
-            else if (photoCount <= 4) cols = 2;
-            else if (photoCount <= 9) cols = 3;
-            else if (photoCount <= 16) cols = 4;
-            else if (photoCount <= 25) cols = 5;
-            else cols = 6;
-
-            galleryGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-
-            photoDays.forEach(day => {
-                const tile = document.createElement('div');
-                tile.classList.add('gallery-tile');
-                const img = document.createElement('img');
-                img.src = savedPhotos[day];
-                tile.appendChild(img);
+            getPhotoData(storageKey).then(savedPhotos => {
+                const photoDays = Object.keys(savedPhotos).sort((a,b) => a - b);
+                const photoCount = photoDays.length;
                 
-                tile.addEventListener('click', () => {
-                    collectActiveMonthPhotos();
-                    currentPhotoIndex = activeMonthPhotos.findIndex(p => p.day == day);
-                    lightboxImage.src = activeMonthPhotos[currentPhotoIndex].src;
-                    lightboxDate.textContent = `${currentMonth}.${day}`;
-                    lightbox.style.display = 'flex';
-                    setTimeout(() => lightbox.classList.add('open'), 10);
+                let cols = 3; 
+                if (photoCount === 0) cols = 1;
+                else if (photoCount === 1) cols = 1;
+                else if (photoCount <= 4) cols = 2;
+                else if (photoCount <= 9) cols = 3;
+                else if (photoCount <= 16) cols = 4;
+                else if (photoCount <= 25) cols = 5;
+                else cols = 6;
+
+                galleryGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+                photoDays.forEach(day => {
+                    const tile = document.createElement('div');
+                    tile.classList.add('gallery-tile');
+                    const img = document.createElement('img');
+                    img.src = savedPhotos[day];
+                    tile.appendChild(img);
+                    
+                    tile.addEventListener('click', () => {
+                        collectActiveMonthPhotos();
+                        currentPhotoIndex = activeMonthPhotos.findIndex(p => p.day == day);
+                        lightboxImage.src = activeMonthPhotos[currentPhotoIndex].src;
+                        lightboxDate.textContent = `${currentMonth}.${day}`;
+                        lightbox.style.display = 'flex';
+                        setTimeout(() => lightbox.classList.add('open'), 10);
+                    });
+                    
+                    galleryGrid.appendChild(tile);
                 });
-                
-                galleryGrid.appendChild(tile);
             });
         }
 
@@ -897,11 +1106,11 @@
             setTimeout(applyLayerEffects, 150);
         }
 
-        function startCardSlideshow(cardObj) {
+        async function startCardSlideshow(cardObj) { 
             if (cardObj.intervalId) clearInterval(cardObj.intervalId);
             
             const storageKey = getStorageKey(currentYear, cardObj.month);
-            const savedPhotos = JSON.parse(localStorage.getItem(storageKey)) || {};
+            const savedPhotos = await getPhotoData(storageKey); 
             const photoUrls = Object.values(savedPhotos);
 
             const imgElements = cardObj.images;
@@ -936,7 +1145,7 @@
             cardObjects.forEach(cardObj => startCardSlideshow(cardObj));
         }
 
-        function drawGrid(targetGrid, year, month) {
+        async function drawGrid(targetGrid, year, month) { 
             targetGrid.innerHTML = '';
             if (month < 1 || month > 12) {
                 targetGrid.style.visibility = 'hidden';
@@ -945,7 +1154,7 @@
             targetGrid.style.visibility = 'visible';
 
             const storageKey = getStorageKey(year, month);
-            let savedPhotos = JSON.parse(localStorage.getItem(storageKey)) || {};
+            const savedPhotos = await getPhotoData(storageKey); 
 
             const startDayOfWeek = new Date(year, month - 1, 1).getDay();
             const daysInMonth = new Date(year, month, 0).getDate();
@@ -1085,17 +1294,16 @@
             const remainingSpace = viewportHeight - imgHeight;
 
             if (remainingSpace < 75) {
-                lightboxDate.style.bottom = '8px';
+                lightboxDate.style.bottom = '3px';
                 lightboxDate.style.right = '8px';
             } else {
-                lightboxDate.style.bottom = '-25px';
+                lightboxDate.style.bottom = '-22px';
                 lightboxDate.style.right = '0px';
             }
         }
 
         lightboxImage.addEventListener('load', adjustLightboxDatePosition);
 
-        // ★追加: ライトボックスの写真をタップした時に、ネイティブファイルダイアログではなくアクションシートを開く
         lightboxImage.addEventListener('click', (e) => {
             e.stopPropagation();
             if (galleryContainer.style.display === 'block') {
@@ -1105,7 +1313,6 @@
             setTimeout(() => actionSheet.classList.add('open'), 10);
         });
 
-        // アクションシートの「キャンセル」または背景タップ
         function closeActionSheet() {
             actionSheet.classList.remove('open');
             setTimeout(() => actionSheet.style.display = 'none', 300);
@@ -1118,23 +1325,21 @@
             if (e.target === actionSheet) closeActionSheet();
         });
 
-        // アクションシートの「写真を変更する」
         actionChangeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             closeActionSheet();
             fileInput.click();
         });
 
-        // アクションシートの「写真を削除する」
-        actionDeleteBtn.addEventListener('click', (e) => {
+        actionDeleteBtn.addEventListener('click', async (e) => { 
             e.stopPropagation();
             if (confirm("この写真をカレンダーから削除しますか？")) {
                 const day = currentSelectedTile.dataset.day;
                 const storageKey = getStorageKey(currentYear, currentMonth);
-                let savedPhotos = JSON.parse(localStorage.getItem(storageKey)) || {};
                 
+                let savedPhotos = await getPhotoData(storageKey); 
                 delete savedPhotos[day];
-                localStorage.setItem(storageKey, JSON.stringify(savedPhotos));
+                await savePhotoData(storageKey, savedPhotos);
 
                 currentSelectedTile.classList.remove('has-image');
                 const img = currentSelectedTile.querySelector('img');
@@ -1160,7 +1365,6 @@
         });
 
         lightbox.addEventListener('click', (e) => {
-            // アクションシートが開いている場合はライトボックスを閉じない
             if (actionSheet.classList.contains('open')) return;
             lightbox.classList.remove('open');
             setTimeout(() => {
@@ -1169,8 +1373,8 @@
         });
 
         // --- カレンダーの表示と同期 ---
-        function updateAllCalendarGrids() {
-            drawGrid(calCurrent, currentYear, currentMonth);
+        async function updateAllCalendarGrids() { 
+            await drawGrid(calCurrent, currentYear, currentMonth);
             drawGrid(calPrev, currentYear, currentMonth - 1);
             drawGrid(calNext, currentYear, currentMonth + 1);
         }
@@ -1254,10 +1458,10 @@
 
             if(scrollTimeoutId) clearTimeout(scrollTimeoutId);
             
-            scrollTimeoutId = setTimeout(() => {
+            scrollTimeoutId = setTimeout(async () => { 
                 isSyncingScroll = true;
                 
-                updateAllCalendarGrids();
+                await updateAllCalendarGrids();
                 syncCalendarPosition();
 
                 const activeCardObj = cardObjects.find(c => c.month === currentMonth);
@@ -1270,17 +1474,17 @@
         });
 
         // --- 画像アップロード ---
-        fileInput.addEventListener('change', (event) => {
+        fileInput.addEventListener('change', async (event) => { 
             const file = event.target.files[0];
             if (file && currentSelectedTile) {
                 const day = currentSelectedTile.dataset.day;
                 const storageKey = getStorageKey(currentYear, currentMonth);
-                let savedPhotos = JSON.parse(localStorage.getItem(storageKey)) || {};
+                let savedPhotos = await getPhotoData(storageKey); 
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const img = new Image();
-                    img.onload = function() {
+                    img.onload = async function() { 
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         
@@ -1322,13 +1526,13 @@
 
                         try {
                             savedPhotos[day] = compressedDataUrl;
-                            localStorage.setItem(storageKey, JSON.stringify(savedPhotos));
+                            await savePhotoData(storageKey, savedPhotos); 
                             
                             const currentCardObj = cardObjects.find(c => c.month === currentMonth);
                             startCardSlideshow(currentCardObj);
 
                         } catch (error) {
-                            alert("保存容量を超えました。");
+                            alert("写真の保存に失敗しました。");
                             console.error(error);
                         }
                     };
@@ -1340,23 +1544,26 @@
         });
 
         // --- 初期起動 ---
-        loadThemeDesign();
-        renderThemeList();
-        createMonthCards();
-        updateAllCalendarGrids();
-        updateAllSlideshows();
+        async function initializeApp() {
+            loadThemeDesign();
+            renderThemeList();
+            createMonthCards();
+            await updateAllCalendarGrids(); 
+            updateAllSlideshows();
+
+            setTimeout(() => {
+                const targetCard = cardObjects.find(c => c.month === currentMonth).element;
+                targetCard.scrollIntoView({ block: 'center', inline: 'nearest' });
+            }, 100);
+        }
 
         window.addEventListener('resize', () => {
             syncCalendarPosition();
             adjustLightboxDatePosition(); 
         });
 
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                const targetCard = cardObjects.find(c => c.month === currentMonth).element;
-                targetCard.scrollIntoView({ block: 'center', inline: 'nearest' });
-            }, 100);
-        });
+        window.addEventListener('load', initializeApp);
+
     </script>
 </body>
 </html>
