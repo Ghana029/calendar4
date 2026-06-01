@@ -27,9 +27,11 @@
             outline: none !important;
         }
 
+        /* ★変更: スマホのUIバーを考慮した高さを指定 */
         html, body {
             width: 100%;
             height: 100%;
+            height: 100dvh; 
             overflow: hidden;
             position: fixed;
             top: 0;
@@ -79,7 +81,6 @@
             flex-shrink: 0;
         }
 
-        /* 月カード（メイン画面） */
         .month-card {
             width: calc(100vw - 20px);
             max-width: 362px;
@@ -187,7 +188,6 @@
             opacity: 0.9;
         }
 
-        /* ボタン類の共通スタイル */
         .theme-select-btn, .toggle-view-btn, .settings-btn, 
         .back-to-months-btn, .gallery-close-btn, .lightbox-close-btn {
             color: var(--text-color);
@@ -219,20 +219,19 @@
         .settings-btn { position: absolute; bottom: 40px; left: 20px; z-index: 10; }
         .gallery-close-btn { position: absolute; top: 40px; left: 20px; z-index: 25; }
 
-        /* ★変更: ライトボックス（拡大表示）用の戻るボタン。写真の邪魔にならないよう調整 */
         .lightbox-close-btn { 
             position: absolute; 
             top: 40px; 
             left: 20px; 
             z-index: 105; 
-            opacity: 0.3; /* 薄くして主張を弱める */
-            background-color: color-mix(in srgb, var(--bg-color) 40%, transparent); /* 背景を半透明に */
-            border-color: color-mix(in srgb, var(--border-color) 40%, transparent); /* 枠線も半透明に */
-            backdrop-filter: blur(4px); /* 写真と文字が同化するのを防ぐすりガラス効果 */
+            opacity: 0.3; 
+            background-color: color-mix(in srgb, var(--bg-color) 40%, transparent); 
+            border-color: color-mix(in srgb, var(--border-color) 40%, transparent); 
+            backdrop-filter: blur(4px); 
             -webkit-backdrop-filter: blur(4px);
         }
         .lightbox-close-btn:hover, .lightbox-close-btn:active {
-            opacity: 1; /* タップ時やホバー時はしっかり表示 */
+            opacity: 1; 
             background-color: color-mix(in srgb, var(--bg-color) 80%, transparent);
         }
 
@@ -395,28 +394,36 @@
             display: inline-block;
         }
 
+        /* ★変更: dvhを用いて画面外へのはみ出しを完全に防止し、余裕をもたせる */
         .lightbox-img {
-            max-width: 362px; 
-            width: calc(100vw - 20px);
-            max-height: calc(100vh - 80px);
+            max-width: calc(100vw - 20px);
+            max-height: calc(100vh - 30px);
+            max-height: calc(100dvh - 30px); /* 画面の高さより30px小さく制限 */
+            width: auto;
+            height: auto;
             display: block;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
             cursor: pointer;
             transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-            object-fit: contain;
+        }
+
+        @media (min-width: 382px) {
+            .lightbox-img {
+                max-width: 362px;
+            }
         }
 
         .lightbox-date {
             position: absolute;
-            bottom: -25px;
-            right: 0;
             color: var(--text-color);
-            opacity: 0.6;
+            opacity: 0.7;
             font-size: 1rem;
             letter-spacing: 0.1em;
             font-weight: 200;
             pointer-events: none;
-            text-shadow: 0 1px 3px var(--bg-color);
+            transition: bottom 0.2s, right 0.2s;
+            z-index: 110;
+            text-shadow: 0 2px 4px var(--bg-color), 0 0 8px var(--bg-color);
         }
 
         /* 5. モーダル共通デザイン */
@@ -696,7 +703,6 @@
             }
         }
 
-
         // --- コア要素の取得と変数 ---
         const scrollContainer = document.getElementById('scroll-container');
         const calendarWrapper = document.getElementById('calendar-wrapper');
@@ -930,6 +936,12 @@
                         lightboxDate.textContent = `${month}.${activeMonthPhotos[currentPhotoIndex].day}`;
                         
                         lightbox.style.display = 'flex';
+                        
+                        // 画像ロード完了時に日付の位置を合わせる
+                        if (lightboxImage.complete) {
+                            adjustLightboxDatePosition();
+                        }
+
                         setTimeout(() => {
                             lightbox.classList.add('open');
                         }, 10);
@@ -978,6 +990,11 @@
                 lightboxImage.src = activeMonthPhotos[currentPhotoIndex].src;
                 lightboxDate.textContent = `${currentMonth}.${activeMonthPhotos[currentPhotoIndex].day}`;
                 currentSelectedTile = activeMonthPhotos[currentPhotoIndex].tileElement;
+                
+                if (lightboxImage.complete) {
+                    adjustLightboxDatePosition();
+                }
+
                 lightboxImage.style.opacity = '1';
             }, 150);
         }
@@ -1018,7 +1035,32 @@
             fileInput.click();
         });
 
-        // ライトボックス用の「戻る」ボタン動作
+        // ★変更: 確実な余白計算と配置ロジック
+        function adjustLightboxDatePosition() {
+            if (!lightbox.classList.contains('open') && lightbox.style.display !== 'flex') return;
+            if (!lightboxImage.clientHeight) return; 
+
+            // 画像の「実際の表示高さ」を取得
+            const imgHeight = lightboxImage.clientHeight;
+            const viewportHeight = window.innerHeight;
+            
+            // 画面の高さと写真の高さの差分（＝上下の余白の合計）
+            const remainingSpace = viewportHeight - imgHeight;
+
+            // 余白が約75px（片側で約37px）未満の場合は、はみ出さないように内側に配置
+            if (remainingSpace < 75) {
+                lightboxDate.style.bottom = '3px';
+                lightboxDate.style.right = '3px';
+            } else {
+                // 十分な余白がある場合は写真のすぐ外側に配置
+                lightboxDate.style.bottom = '-20px';
+                lightboxDate.style.right = '0px';
+            }
+        }
+
+        // 写真が読み込まれたタイミングで確実に位置を再計算
+        lightboxImage.addEventListener('load', adjustLightboxDatePosition);
+
         lightboxCloseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             lightbox.classList.remove('open');
@@ -1212,7 +1254,10 @@
         updateAllCalendarGrids();
         updateAllSlideshows();
 
-        window.addEventListener('resize', syncCalendarPosition);
+        window.addEventListener('resize', () => {
+            syncCalendarPosition();
+            adjustLightboxDatePosition(); 
+        });
 
         window.addEventListener('load', () => {
             setTimeout(() => {
